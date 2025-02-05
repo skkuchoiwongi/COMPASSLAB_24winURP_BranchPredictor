@@ -97,7 +97,6 @@ class BHT(params: BHTParams)(implicit val p: Parameters) extends HasCoreParamete
       hi(log2Ceil(params.component_nEntries)-1, 0) ^ (hi >> log2Ceil(params.component_nEntries))(1, 0)
     }
     hashAddr(addr)
-    //(addr>>log2Ceil(fetchBytes)) (9,0)
   }
   def index1(addr: UInt, history: UInt) = {
     val hi = addr >> log2Ceil(fetchBytes)
@@ -215,42 +214,14 @@ class BHT(params: BHTParams)(implicit val p: Parameters) extends HasCoreParamete
       when(mispredict){
         when(use_pred===1.U){ //when used prov but miss, but alt is correct
           value_update := use_alt_confidence_counter(index_confidence(addr)) + 1.U //in this case, confidence is low, so impossible to be saturated. so just add + 1.U
-          when(TC_counter === 0.U){
-            TC_counter := neg_zero
-            //use_alt_threshold := Mux(use_alt_threshold===0.U, 0.U, use_alt_threshold - 1.U)
-            //printf(cf"use_alt_threshold: $use_alt_threshold\n")
-          }.otherwise{
-            TC_counter := TC_counter - 1.U
-          }
         }.otherwise{ //when used alt but miss, but prov is correct
           value_update := use_alt_confidence_counter(index_confidence(addr)) - 1.U
-          when(TC_counter === tc_max){
-            TC_counter := pos_zero
-            //use_alt_threshold := Mux(use_alt_threshold===use_alt_threshold_max, use_alt_threshold_max, use_alt_threshold + 1.U)
-            //printf(cf"use_alt_threshold: $use_alt_threshold\n")
-          }.otherwise{
-            TC_counter := TC_counter + 1.U
-          }
         }
       }.otherwise{
         when(use_pred===1.U){ //when used prov is correct
           value_update := Mux(use_alt_confidence_counter(index_confidence(addr)) === 0.U, 0.U, use_alt_confidence_counter(index_confidence(addr)) - 1.U)
-          when(TC_counter === tc_max){
-            TC_counter := pos_zero
-            //use_alt_threshold := Mux(use_alt_threshold===use_alt_threshold_max, use_alt_threshold_max, use_alt_threshold + 1.U)
-            //printf(cf"use_alt_threshold: $use_alt_threshold\n")
-          }.otherwise{
-            TC_counter := TC_counter + 1.U
-          }
         }.otherwise{ //when used alt is correct
           value_update := Mux(use_alt_confidence_counter(index_confidence(addr)) === use_alt_max, use_alt_max, use_alt_confidence_counter(index_confidence(addr)) + 1.U)
-          when(TC_counter === 0.U){
-            TC_counter := neg_zero
-            //use_alt_threshold := Mux(use_alt_threshold===0.U, 0.U, use_alt_threshold - 1.U)
-            //printf(cf"use_alt_threshold: $use_alt_threshold\n")
-          }.otherwise{
-            TC_counter := TC_counter - 1.U
-          }
         }
       }
       use_alt_confidence_counter(index_confidence(addr)) := value_update
@@ -481,10 +452,6 @@ class BHT(params: BHTParams)(implicit val p: Parameters) extends HasCoreParamete
   private val use_pred = RegInit(0.U(1.W)) //1이면 prov, 0이면 alt 사용
   private val use_alt_threshold = RegInit(14.U(4.W))
   private val use_alt_threshold_max = (1.U << 4) -1.U
-  private val TC_counter = RegInit(8.U(4.W)) //TC counter: count number of updates at correct and miss
-  private val tc_max = (1.U << 4) - 1.U
-  private val pos_zero = (1.U << 3)
-  private val neg_zero = (1.U << 3) - 1.U
 
   private val T1_pred = Mem(params.component_nEntries,UInt(params.counterLength.W))
   private val T2_pred = Mem(params.component_nEntries,UInt(params.counterLength.W))
