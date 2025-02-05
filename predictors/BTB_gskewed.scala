@@ -11,9 +11,9 @@ import freechips.rocketchip.tile.HasCoreParameters
 import freechips.rocketchip.util._
 
 case class BHTParams(
-  nEntries: Int = 4096,
+  nEntries: Int = 8192,
   counterLength: Int = 2,
-  historyLength: Int = 12,
+  historyLength: Int = 13,
   historyBits: Int = 4)
 
 case class BTBParams(
@@ -127,13 +127,12 @@ class BHT(params: BHTParams)(implicit val p: Parameters) extends HasCoreParamete
     res.history := history
     res
   }
-  def updateTable(addr: UInt, d: BHTResp, taken: Bool): Unit = {
-    val misprediction = Mux(d.taken === taken, false.B, true.B)
+  def updateTable(addr: UInt, d: BHTResp, taken: Bool, misprediction: Bool): Unit = {
     wen0 := true.B
     wen1 := true.B
     wen2 := true.B
     when (!resetting) {
-      //correct인 경우
+      //when correct
       when(!misprediction){
         //예측과 결과가 다른 경우 해당 table update하지않음 (partial update), 또한, correct인 경우, 무조건 3개 중 2개가 branch 결과와 동일하기에 하단의 code 진행 시, wen = false가 되는 것은 1개의 PHT밖에 없음
         when(d.value00(0)=/=taken){wen0 := false.B}
@@ -383,7 +382,7 @@ class BTB(implicit p: Parameters) extends BtbModule {
     }
     when (io.bht_update.valid) {
       when (io.bht_update.bits.branch) {
-        bht.updateTable(io.bht_update.bits.pc, io.bht_update.bits.prediction, io.bht_update.bits.taken)
+        bht.updateTable(io.bht_update.bits.pc, io.bht_update.bits.prediction, io.bht_update.bits.taken,io.bht_update.bits.mispredict)
         accessCount := accessCount + 1.U
         printf(cf"access count = $accessCount\n")
         when (io.bht_update.bits.mispredict) {
